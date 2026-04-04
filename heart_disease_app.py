@@ -11,8 +11,10 @@ scaler = load('scaler.joblib')
 
 st.title("Heart Disease Prediction")
 
-# User selects model
-model_choice = st.selectbox("Select Model", ["ANN", "KNN"])
+# Sidebar - select model
+st.sidebar.header("Settings")
+model_choice = st.sidebar.selectbox("Select Model", ["ANN", "KNN"])
+st.sidebar.write(f"Current model: {model_choice}")
 
 # User input
 age = st.number_input("Age", min_value=1, max_value=120, value=50)
