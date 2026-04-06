@@ -7,43 +7,19 @@ import seaborn as sns
 
 st.set_page_config(page_title="Heart Disease Prediction", layout="wide")
 
-# Force light theme + custom CSS
-st.markdown("""
-<style>
-    [data-testid="stSidebar"] {
-        background-color: #1B2838;
-    }
-    [data-testid="stSidebar"] * {
-        color: white !important;
-    }
-    .block-container {
-        padding-top: 2rem;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Load models
 ann_model = load('ann_model.joblib')
 knn_model = load('knn_model.joblib')
 encoder = load('encoder.joblib')
 scaler = load('scaler.joblib')
 
-# Sidebar
-st.sidebar.title("Heart Disease Predictor")
-st.sidebar.caption("ANN & KNN Classification")
-st.sidebar.markdown("---")
-page = st.sidebar.radio("Navigate", ["Home", "Prediction", "Model Comparison", "Dataset Info"])
-st.sidebar.markdown("---")
-st.sidebar.caption("Cleveland Heart Disease Dataset")
-st.sidebar.caption("UCI Machine Learning Repository")
-st.sidebar.caption("Built with Python & Streamlit")
+st.title("Heart Disease Prediction System")
+st.caption("Supervised Machine Learning | ANN & KNN | Cleveland Heart Disease Dataset (UCI)")
+st.markdown("---")
+
+tab1, tab2, tab3, tab4 = st.tabs(["Home", "Prediction", "Model Comparison", "Dataset Info"])
 
 # ============ HOME ============
-if page == "Home":
-    st.title("Heart Disease Prediction System")
-    st.caption("A supervised machine learning project using ANN and KNN")
-    st.markdown("---")
-
+with tab1:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Patients", "303")
     c2.metric("Features", "13")
@@ -62,16 +38,11 @@ if page == "Home":
 
     st.markdown("---")
     st.subheader("How to Use")
-    st.write("Select **Prediction** from the sidebar to test the model. Select **Model Comparison** to view results.")
+    st.write("Click on the **Prediction** tab to test the model. Click **Model Comparison** to view results.")
 
 # ============ PREDICTION ============
-elif page == "Prediction":
-    st.title("Prediction")
-    st.caption("Select a model and enter patient data")
-    st.markdown("---")
-
+with tab2:
     model_choice = st.selectbox("Model", ["ANN", "KNN"])
-
     st.markdown("---")
 
     col1, col2, col3 = st.columns(3)
@@ -126,11 +97,7 @@ elif page == "Prediction":
         st.caption(f"Model used: {model_choice}")
 
 # ============ COMPARISON ============
-elif page == "Model Comparison":
-    st.title("Model Comparison")
-    st.caption("ANN vs KNN performance analysis")
-    st.markdown("---")
-
+with tab3:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("ANN Accuracy", "90.2%")
     c2.metric("KNN Accuracy", "90.16%")
@@ -139,32 +106,27 @@ elif page == "Model Comparison":
 
     st.markdown("---")
 
-    st.subheader("Metrics Table")
-    comparison = pd.DataFrame({
-        'Metric': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
-        'ANN': [0.902, 0.933, 0.875, 0.903],
-        'KNN': [0.9016, 0.9333, 0.8750, 0.9032]
-    })
-    st.dataframe(comparison, use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    st.subheader("Bar Chart")
-    fig, ax = plt.subplots(figsize=(10, 5))
-    x = np.arange(4)
-    width = 0.35
-    bars1 = ax.bar(x - width/2, [0.902, 0.933, 0.875, 0.903], width, label='ANN', color='#2196F3')
-    bars2 = ax.bar(x + width/2, [0.9016, 0.9333, 0.8750, 0.9032], width, label='KNN', color='#FF9800')
-    ax.set_ylabel('Score')
-    ax.set_xticks(x)
-    ax.set_xticklabels(['Accuracy', 'Precision', 'Recall', 'F1 Score'])
-    ax.legend()
-    ax.set_ylim(0.8, 1.0)
-    for bar in bars1:
-        ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 0.003, f'{bar.get_height():.3f}', ha='center', fontsize=9)
-    for bar in bars2:
-        ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 0.003, f'{bar.get_height():.3f}', ha='center', fontsize=9)
-    st.pyplot(fig)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Metrics Table")
+        comparison = pd.DataFrame({
+            'Metric': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
+            'ANN': [0.902, 0.933, 0.875, 0.903],
+            'KNN': [0.9016, 0.9333, 0.8750, 0.9032]
+        })
+        st.dataframe(comparison, use_container_width=True, hide_index=True)
+    with col2:
+        st.subheader("Bar Chart")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        x = np.arange(4)
+        width = 0.35
+        ax.bar(x - width/2, [0.902, 0.933, 0.875, 0.903], width, label='ANN', color='#2196F3')
+        ax.bar(x + width/2, [0.9016, 0.9333, 0.8750, 0.9032], width, label='KNN', color='#FF9800')
+        ax.set_xticks(x)
+        ax.set_xticklabels(['Acc', 'Prec', 'Recall', 'F1'])
+        ax.legend()
+        ax.set_ylim(0.8, 1.0)
+        st.pyplot(fig)
 
     st.markdown("---")
 
@@ -190,15 +152,10 @@ elif page == "Model Comparison":
         st.pyplot(fig2)
 
     st.markdown("---")
-    st.subheader("Summary")
     st.write("Both models achieved accuracy above 90%. Both correctly identified 28 out of 32 heart disease cases. 4 cases were missed. There is no significant difference between ANN and KNN on this dataset.")
 
 # ============ DATASET ============
-elif page == "Dataset Info":
-    st.title("Dataset Information")
-    st.caption("Cleveland Heart Disease Dataset")
-    st.markdown("---")
-
+with tab4:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Overview")
