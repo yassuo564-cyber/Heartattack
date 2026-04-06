@@ -16,7 +16,7 @@ st.title("Heart Disease Prediction System")
 st.caption("Supervised Machine Learning | ANN & KNN | Cleveland Heart Disease Dataset (UCI)")
 st.markdown("---")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Home", "Prediction", "Model Comparison", "Dataset Info"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home", "Prediction", "Model Comparison", "Member Work", "Dataset Info"])
 
 # ============ HOME ============
 with tab1:
@@ -38,7 +38,7 @@ with tab1:
 
     st.markdown("---")
     st.subheader("How to Use")
-    st.write("Click on the **Prediction** tab to test the model. Click **Model Comparison** to view results.")
+    st.write("Click on the **Prediction** tab to test the model. Click **Model Comparison** to view results. Click **Member Work** to see each member's contribution.")
 
 # ============ PREDICTION ============
 with tab2:
@@ -154,8 +154,112 @@ with tab3:
     st.markdown("---")
     st.write("Both models achieved accuracy above 90%. Both correctly identified 28 out of 32 heart disease cases. 4 cases were missed. There is no significant difference between ANN and KNN on this dataset.")
 
-# ============ DATASET ============
+# ============ MEMBER WORK ============
 with tab4:
+    st.subheader("Member 1 - ANN (MLPClassifier)")
+    st.markdown("---")
+
+    st.write("**Algorithm:** Artificial Neural Network (MLPClassifier)")
+    st.write("**Preprocessing:** Missing values filled with median")
+    st.write("**Model Settings:** hidden_layer_sizes=(100,), max_iter=500, random_state=42")
+    st.write("**Train/Test Split:** 80% training, 20% testing")
+
+    st.write("**Code Overview:**")
+    st.code("""
+# Load dataset
+url = "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+df = pd.read_csv(url, names=column_names, na_values='?')
+
+# Handle missing values
+df = df.fillna(df.median())
+
+# Convert target to binary
+df['target'] = df['target'].apply(lambda x: 1 if x > 0 else 0)
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train ANN
+ann = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500, random_state=42)
+ann.fit(X_train, y_train)
+y_pred_ann = ann.predict(X_test)
+    """, language="python")
+
+    st.write("**Results:**")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Accuracy", "90.2%")
+    col2.metric("Precision", "93.3%")
+    col3.metric("Recall", "87.5%")
+    col4.metric("F1 Score", "0.903")
+
+    fig1, ax1 = plt.subplots(figsize=(5, 4))
+    sns.heatmap(np.array([[27, 2], [4, 28]]), annot=True, fmt='d', cmap='Blues',
+                xticklabels=['No Disease', 'Disease'],
+                yticklabels=['No Disease', 'Disease'], ax=ax1, annot_kws={'size': 16})
+    ax1.set_xlabel('Predicted')
+    ax1.set_ylabel('Actual')
+    ax1.set_title('ANN Confusion Matrix')
+    st.pyplot(fig1)
+
+    st.markdown("---")
+    st.markdown("---")
+
+    st.subheader("Member 2 - KNN (KNeighborsClassifier)")
+    st.markdown("---")
+
+    st.write("**Algorithm:** K-Nearest Neighbours (KNeighborsClassifier)")
+    st.write("**Preprocessing:** Missing values filled with mode, OneHotEncoder, StandardScaler")
+    st.write("**Hyperparameter Tuning:** Tested k=1 to 39, selected best k")
+    st.write("**Train/Test Split:** 80% training, 20% testing")
+
+    st.write("**Code Overview:**")
+    st.code("""
+# Load dataset
+df = pd.read_csv(file_path, names=columns, na_values='?')
+
+# Handle missing values
+for col in ['ca', 'thal']:
+    df[col] = df[col].fillna(df[col].mode()[0])
+
+# Convert target to binary
+df['target'] = df['target'].apply(lambda x: 0 if x == 0 else 1)
+
+# OneHotEncoder + StandardScaler
+encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+scaler = StandardScaler()
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X_processed, y, test_size=0.2, random_state=42)
+
+# Find best K
+for i in range(1, 40):
+    knn = KNeighborsClassifier(n_neighbors=i)
+    knn.fit(X_train, y_train)
+
+# Train KNN with best K
+knn_model = KNeighborsClassifier(n_neighbors=best_k)
+knn_model.fit(X_train, y_train)
+y_pred = knn_model.predict(X_test)
+    """, language="python")
+
+    st.write("**Results:**")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Accuracy", "90.16%")
+    col2.metric("Precision", "93.33%")
+    col3.metric("Recall", "87.50%")
+    col4.metric("F1 Score", "0.903")
+
+    fig2, ax2 = plt.subplots(figsize=(5, 4))
+    sns.heatmap(np.array([[27, 2], [4, 28]]), annot=True, fmt='d', cmap='Oranges',
+                xticklabels=['No Disease', 'Disease'],
+                yticklabels=['No Disease', 'Disease'], ax=ax2, annot_kws={'size': 16})
+    ax2.set_xlabel('Predicted')
+    ax2.set_ylabel('Actual')
+    ax2.set_title('KNN Confusion Matrix')
+    st.pyplot(fig2)
+
+# ============ DATASET ============
+with tab5:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Overview")
