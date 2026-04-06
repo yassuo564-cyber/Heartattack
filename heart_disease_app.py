@@ -67,14 +67,30 @@ encoder = load('encoder.joblib')
 scaler = load('scaler.joblib')
 
 # Sidebar
-st.sidebar.markdown("## Heart Disease Predictor")
+# Sidebar
+st.sidebar.markdown("""
+<div style="text-align: center; padding: 1rem 0;">
+    <h1 style="color: #FF4B4B; font-size: 1.5rem; margin-bottom: 0;">Heart Disease</h1>
+    <p style="color: #AAAAAA; font-size: 0.9rem;">Prediction System</p>
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.markdown("---")
+
 page = st.sidebar.radio("", ["Home", "Prediction", "Model Comparison", "Dataset Info"])
+
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Built with**")
-st.sidebar.markdown("Python | Scikit-learn | Streamlit")
-st.sidebar.markdown("**Dataset**")
-st.sidebar.markdown("Cleveland Heart Disease (UCI)")
+
+st.sidebar.markdown("""
+<div style="padding: 0.5rem 0;">
+    <p style="color: #FF4B4B; font-size: 0.8rem; margin-bottom: 0.3rem;">ALGORITHMS</p>
+    <p style="color: #FFFFFF; font-size: 0.85rem;">ANN & KNN</p>
+    <p style="color: #FF4B4B; font-size: 0.8rem; margin-bottom: 0.3rem;">DATASET</p>
+    <p style="color: #FFFFFF; font-size: 0.85rem;">Cleveland Heart Disease</p>
+    <p style="color: #FF4B4B; font-size: 0.8rem; margin-bottom: 0.3rem;">SOURCE</p>
+    <p style="color: #FFFFFF; font-size: 0.85rem;">UCI Repository</p>
+</div>
+""", unsafe_allow_html=True)
 
 # ============ HOME ============
 if page == "Home":
