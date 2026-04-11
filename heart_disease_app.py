@@ -86,10 +86,18 @@ with tab1:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("ANN")
-        st.write("Artificial Neural Network using MLPClassifier. Learns complex patterns through hidden layers and backpropagation.")
+        st.write("Artificial Neural Network using MLPClassifier. Has 100 hidden neurons and learns through backpropagation.")
     with col2:
         st.subheader("KNN")
-        st.write("K-Nearest Neighbours predicts class labels based on the majority vote of the nearest samples.")
+        st.write("K-Nearest Neighbours using KNeighborsClassifier. Predicts using the majority vote of nearest neighbours.")
+
+    st.markdown("---")
+    st.subheader("How to Use")
+    st.write("1. Open the Prediction tab.")
+    st.write("2. Fill in patient information.")
+    st.write("3. Select ANN or KNN model.")
+    st.write("4. Run prediction and review confidence chart.")
+    st.write("5. Open Model Comparison to compare both methods.")
 
     st.markdown("---")
     st.subheader("Project Workflow")
@@ -248,12 +256,12 @@ with tab2:
         st.subheader("Prediction Confidence")
         fig, ax = plt.subplots(figsize=(6, 4))
         labels = ["ANN", "KNN"]
-        values = [ann_prob, knn_prob]
+        probs = [ann_prob, knn_prob]
         colors = ["#2196F3", "#FF9800"]
-        bars = ax.bar(labels, values, color=colors)
+        bars = ax.bar(labels, probs, color=colors)
         ax.set_ylim(0, 1)
-        ax.set_ylabel("Probability of Disease")
-        ax.set_title("Prediction Probability by Model")
+        ax.set_ylabel("Probability of Heart Disease")
+        ax.set_title("Prediction Confidence by Model")
         for bar in bars:
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
@@ -532,6 +540,25 @@ with tab5:
         for i, v in enumerate([138, 165]):
             ax.text(i, v + 2, str(v), ha='center', fontsize=14)
         st.pyplot(fig)
+
+    st.markdown("---")
+    st.subheader("Missing Values Before Preprocessing")
+    missing_df = pd.DataFrame({
+        "Feature": ["ca", "thal"],
+        "Missing Count": [4, 2]
+    })
+    fig_missing, ax_missing = plt.subplots(figsize=(5, 4))
+    bars = ax_missing.bar(missing_df["Feature"], missing_df["Missing Count"], color=["#EF4444", "#F59E0B"])
+    ax_missing.set_ylabel("Missing Count")
+    ax_missing.set_title("Missing Values in Dataset")
+    for bar in bars:
+        ax_missing.text(
+            bar.get_x() + bar.get_width()/2,
+            bar.get_height() + 0.1,
+            f"{int(bar.get_height())}",
+            ha="center"
+        )
+    st.pyplot(fig_missing)
 
     st.markdown("---")
     st.subheader("Features")
