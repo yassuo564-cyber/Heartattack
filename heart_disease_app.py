@@ -31,29 +31,30 @@ def plot_radar_chart():
     ann_vals = np.array([ANN_ACCURACY, ANN_PRECISION, ANN_RECALL, ANN_F1, ANN_AUC])
     knn_vals = np.array([KNN_ACCURACY, KNN_PRECISION, KNN_RECALL, KNN_F1, KNN_AUC])
 
-    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
 
     ann_vals = np.concatenate((ann_vals, [ann_vals[0]]))
     knn_vals = np.concatenate((knn_vals, [knn_vals[0]]))
     angles = np.concatenate((angles, [angles[0]]))
 
-    fig = plt.figure(figsize=(6, 6))
+    fig = plt.figure(figsize=(6,6))
     ax = fig.add_subplot(111, polar=True)
 
-    ax.plot(angles, ann_vals, linewidth=2, label="ANN")
-    ax.fill(angles, ann_vals, alpha=0.2)
+    # ANN
+    ax.plot(angles, ann_vals, linewidth=2, marker='o', label="ANN")
+    ax.fill(angles, ann_vals, alpha=0.25)
 
-    ax.plot(angles, knn_vals, linewidth=2, label="KNN")
-    ax.fill(angles, knn_vals, alpha=0.2)
+    # KNN
+    ax.plot(angles, knn_vals, linewidth=2, marker='o', label="KNN")
+    ax.fill(angles, knn_vals, alpha=0.25)
 
-    ax.set_thetagrids(angles[:-1] * 180 / np.pi, labels)
-    ax.set_ylim(0.8, 1.0)
+    ax.set_thetagrids(angles[:-1]*180/np.pi, labels)
+    ax.set_ylim(0.85, 1.0)
 
-    ax.set_title("Radar Chart Comparison")
+    ax.set_title("Model Performance Radar Chart")
     ax.legend(loc="upper right")
 
     return fig
-
 st.markdown("""
 <style>
     .stTabs [data-baseweb="tab-list"] {
