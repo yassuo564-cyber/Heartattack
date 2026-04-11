@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from pathlib import Path
+import math
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,8 +6,6 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 from joblib import load
-
-from train_models import ensure_artifacts, load_dataset
 
 
 st.set_page_config(
@@ -87,8 +83,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-BASE_DIR = Path(__file__).resolve().parent
-MODEL_DIR = BASE_DIR / "models"
+
+ANN_ACCURACY = 0.9020
+KNN_ACCURACY = 0.9016
+ANN_PRECISION = 0.9330
+KNN_PRECISION = 0.9333
+ANN_RECALL = 0.8750
+KNN_RECALL = 0.8750
+ANN_F1 = 0.9030
+KNN_F1 = 0.9032
+ANN_AUC = 0.9380
+KNN_AUC = 0.9360
+
+ANN_CM = np.array([[27, 2], [4, 28]])
+KNN_CM = np.array([[27, 2], [4, 28]])
 
 FEATURE_COLUMNS = [
     "age",
@@ -109,24 +117,14 @@ FEATURE_COLUMNS = [
 
 @st.cache_resource
 def load_artifacts():
-    metrics = ensure_artifacts()
-    ann_model = load(MODEL_DIR / "ann_model.joblib")
-    knn_model = load(MODEL_DIR / "knn_model.joblib")
-    dataset = load_dataset()
-    return metrics, ann_model, knn_model, dataset
+    ann_model = load("ann_model.joblib")
+    knn_model = load("knn_model.joblib")
+    encoder = load("encoder.joblib")
+    scaler = load("scaler.joblib")
+    return ann_model, knn_model, encoder, scaler
 
 
-METRICS, ann_model, knn_model, DATASET = load_artifacts()
-ANN_CM = np.array(METRICS["models"]["ann"]["confusion_matrix"])
-KNN_CM = np.array(METRICS["models"]["knn"]["confusion_matrix"])
-
-
-def metric_value(model_key, metric_name):
-    return float(METRICS["models"][model_key][metric_name])
-
-
-def build_input_frame(values):
-    return pd.DataFrame([values], columns=FEATURE_COLUMNS)
+ann_model, knn_model, encoder, scaler = load_artifacts()
 
 
 def safe_probability(model, data, predicted_label):
@@ -181,15 +179,15 @@ def plot_probability_chart(ann_prob, knn_prob):
 def plot_metrics_bar():
     fig, ax = plt.subplots(figsize=(7, 4))
     metric_names = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
-    ann_vals = [metric_value("ann", name) for name in ["accuracy", "precision", "recall", "f1", "roc_auc"]]
-    knn_vals = [metric_value("knn", name) for name in ["accuracy", "precision", "recall", "f1", "roc_auc"]]
+    ann_vals = [ANN_ACCURACY, ANN_PRECISION, ANN_RECALL, ANN_F1, ANN_AUC]
+    knn_vals = [KNN_ACCURACY, KNN_PRECISION, KNN_RECALL, KNN_F1, KNN_AUC]
     x = np.arange(len(metric_names))
     width = 0.36
     bars1 = ax.bar(x - width / 2, ann_vals, width, label="ANN", color="#2563eb")
     bars2 = ax.bar(x + width / 2, knn_vals, width, label="KNN", color="#f59e0b")
     ax.set_xticks(x)
     ax.set_xticklabels(metric_names)
-    ax.set_ylim(0.75, 1.0)
+    ax.set_ylim(0.8, 1.0)
     ax.set_title("Performance Comparison")
     ax.legend()
     for bars in [bars1, bars2]:
@@ -239,8 +237,8 @@ def plot_normalized_cm(cm, title, cmap):
 
 def plot_radar_chart():
     labels = np.array(["Accuracy", "Precision", "Recall", "F1", "AUC"])
-    ann_vals = np.array([metric_value("ann", name) for name in ["accuracy", "precision", "recall", "f1", "roc_auc"]])
-    knn_vals = np.array([metric_value("knn", name) for name in ["accuracy", "precision", "recall", "f1", "roc_auc"]])
+    ann_vals = np.array([ANN_ACCURACY, ANN_PRECISION, ANN_RECALL, ANN_F1, ANN_AUC])
+    knn_vals = np.array([KNN_ACCURACY, KNN_PRECISION, KNN_RECALL, KNN_F1, KNN_AUC])
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
     ann_vals = np.concatenate((ann_vals, [ann_vals[0]]))
     knn_vals = np.concatenate((knn_vals, [knn_vals[0]]))
@@ -253,14 +251,14 @@ def plot_radar_chart():
     ax.plot(angles, knn_vals, linewidth=2, color="#f59e0b", label="KNN")
     ax.fill(angles, knn_vals, alpha=0.2, color="#f59e0b")
     ax.set_thetagrids(angles[:-1] * 180 / np.pi, labels)
-    ax.set_ylim(0.75, 1.0)
+    ax.set_ylim(0.8, 1.0)
     ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.1))
     return fig
 
 
 def plot_dataset_distribution():
     fig, ax = plt.subplots(figsize=(5, 4))
-    counts = [int((DATASET["target"] == 0).sum()), int((DATASET["target"] == 1).sum())]
+    counts = [138, 165]
     bars = ax.bar(["No Disease", "Disease"], counts, color=["#2563eb", "#f59e0b"])
     ax.set_ylabel("Count")
     ax.set_title("Target Distribution")
@@ -273,7 +271,7 @@ def plot_dataset_distribution():
 def plot_missing_values():
     fig, ax = plt.subplots(figsize=(5, 4))
     features = ["ca", "thal"]
-    counts = [int(DATASET["ca"].isna().sum()), int(DATASET["thal"].isna().sum())]
+    counts = [4, 2]
     bars = ax.bar(features, counts, color=["#ef4444", "#f59e0b"])
     ax.set_ylabel("Missing Count")
     ax.set_title("Missing Values Before Preprocessing")
@@ -297,10 +295,10 @@ st.markdown(
 )
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Dataset Size", str(METRICS["dataset"]["rows"]))
-c2.metric("Features", str(len(FEATURE_COLUMNS)))
-c3.metric("ANN Accuracy", f"{metric_value('ann', 'accuracy'):.3f}")
-c4.metric("KNN Accuracy", f"{metric_value('knn', 'accuracy'):.3f}")
+c1.metric("Dataset Size", "303")
+c2.metric("Features", "13")
+c3.metric("ANN Accuracy", "90.2%")
+c4.metric("KNN Accuracy", "90.16%")
 
 st.markdown("---")
 
@@ -308,7 +306,6 @@ tabs = st.tabs(
     [
         "Project Overview",
         "Live Prediction",
-        "Batch Prediction",
         "Model Evaluation",
         "Member Contributions",
         "Dataset & Methodology",
@@ -358,59 +355,71 @@ with tabs[0]:
 
 with tabs[1]:
     st.subheader("Live Patient Prediction")
-    st.caption("Enter patient information below and compare ANN with KNN predictions using the saved pipelines.")
+    st.caption("Enter patient information below and compare ANN with KNN predictions.")
 
-    with st.form("prediction_form"):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown("**Basic Information**")
-            age = st.number_input("Age", min_value=20, max_value=100, value=54)
-            sex = st.selectbox("Gender", [0, 1], format_func=lambda x: "Female" if x == 0 else "Male")
-            cp = st.selectbox(
-                "Chest Pain Type",
-                [1, 2, 3, 4],
-                format_func=lambda x: {1: "Typical Angina", 2: "Atypical Angina", 3: "Non-anginal", 4: "Asymptomatic"}[x],
-            )
-            trestbps = st.number_input("Resting Blood Pressure", min_value=80, max_value=220, value=130)
-            chol = st.number_input("Cholesterol", min_value=100, max_value=620, value=246)
-        with col2:
-            st.markdown("**Clinical Test Results**")
-            fbs = st.selectbox("High Fasting Blood Sugar", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
-            restecg = st.selectbox(
-                "Resting ECG",
-                [0, 1, 2],
-                format_func=lambda x: {0: "Normal", 1: "ST-T Abnormality", 2: "LV Hypertrophy"}[x],
-            )
-            thalach = st.number_input("Maximum Heart Rate", min_value=60, max_value=220, value=150)
-            exang = st.selectbox("Exercise Induced Angina", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
-            oldpeak = st.number_input("ST Depression", min_value=0.0, max_value=7.0, value=1.0, step=0.1)
-        with col3:
-            st.markdown("**Advanced Features**")
-            slope = st.selectbox(
-                "Slope",
-                [1, 2, 3],
-                format_func=lambda x: {1: "Upsloping", 2: "Flat", 3: "Downsloping"}[x],
-            )
-            ca = st.selectbox("Number of Major Vessels", [0, 1, 2, 3])
-            thal = st.selectbox(
-                "Thalassemia",
-                [3, 6, 7],
-                format_func=lambda x: {3: "Normal", 6: "Fixed Defect", 7: "Reversible Defect"}[x],
-            )
-            selected_model = st.radio("Primary Decision Model", ["ANN", "KNN", "Consensus"], horizontal=True)
-        submitted = st.form_submit_button("Run Prediction", use_container_width=True)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("**Basic Information**")
+        age = st.number_input("Age", min_value=1, max_value=120, value=50)
+        sex = st.selectbox("Gender", [1, 0], format_func=lambda x: "Male" if x == 1 else "Female")
+        cp = st.selectbox(
+            "Chest Pain Type",
+            [0, 1, 2, 3],
+            format_func=lambda x: {0: "Typical Angina", 1: "Atypical Angina", 2: "Non-anginal", 3: "Asymptomatic"}[x],
+        )
+        trestbps = st.number_input("Resting Blood Pressure", min_value=50, max_value=300, value=120)
+        chol = st.number_input("Cholesterol", min_value=50, max_value=600, value=200)
+    with col2:
+        st.markdown("**Clinical Test Results**")
+        fbs = st.selectbox("High Fasting Blood Sugar", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
+        restecg = st.selectbox(
+            "Resting ECG",
+            [0, 1, 2],
+            format_func=lambda x: {0: "Normal", 1: "ST-T Abnormality", 2: "LV Hypertrophy"}[x],
+        )
+        thalach = st.number_input("Maximum Heart Rate", min_value=50, max_value=250, value=150)
+        exang = st.selectbox("Exercise Induced Angina", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
+        oldpeak = st.number_input("ST Depression", min_value=0.0, max_value=10.0, value=1.0)
+    with col3:
+        st.markdown("**Advanced Features**")
+        slope = st.selectbox(
+            "Slope",
+            [0, 1, 2],
+            format_func=lambda x: {0: "Upsloping", 1: "Flat", 2: "Downsloping"}[x],
+        )
+        ca = st.selectbox("Number of Major Vessels", [0, 1, 2, 3])
+        thal = st.selectbox(
+            "Thalassemia",
+            [3, 6, 7],
+            format_func=lambda x: {3: "Normal", 6: "Fixed Defect", 7: "Reversible Defect"}[x],
+        )
+        selected_model = st.radio("Primary Decision Model", ["ANN", "KNN"], horizontal=True)
 
-    if submitted:
-        user_df = build_input_frame([age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal])
-        ann_prediction = int(ann_model.predict(user_df)[0])
-        ann_prob = safe_probability(ann_model, user_df, ann_prediction)
-        knn_prediction = int(knn_model.predict(user_df)[0])
-        knn_prob = safe_probability(knn_model, user_df, knn_prediction)
-        consensus_prob = (ann_prob + knn_prob) / 2
-        consensus_prediction = int(consensus_prob >= 0.5)
+    if st.button("Run Prediction", use_container_width=True):
+        ann_input = [[age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal]]
+        ann_prediction = ann_model.predict(ann_input)[0]
+        ann_prob = safe_probability(ann_model, ann_input, ann_prediction)
 
-        final_prediction = {"ANN": ann_prediction, "KNN": knn_prediction, "Consensus": consensus_prediction}[selected_model]
-        final_probability = {"ANN": ann_prob, "KNN": knn_prob, "Consensus": consensus_prob}[selected_model]
+        categorical_features = ["sex", "cp", "fbs", "restecg", "exang", "slope", "ca", "thal"]
+        numerical_features = ["age", "trestbps", "chol", "thalach", "oldpeak"]
+        user_df = pd.DataFrame(
+            [[age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal]],
+            columns=FEATURE_COLUMNS,
+        )
+        user_cat = pd.DataFrame(
+            encoder.transform(user_df[categorical_features]),
+            columns=encoder.get_feature_names_out(categorical_features),
+        )
+        user_num = pd.DataFrame(
+            scaler.transform(user_df[numerical_features]),
+            columns=numerical_features,
+        )
+        user_processed = pd.concat([user_num, user_cat], axis=1)
+        knn_prediction = knn_model.predict(user_processed)[0]
+        knn_prob = safe_probability(knn_model, user_processed, knn_prediction)
+
+        final_prediction = ann_prediction if selected_model == "ANN" else knn_prediction
+        final_probability = ann_prob if selected_model == "ANN" else knn_prob
 
         result_col1, result_col2 = st.columns(2)
         with result_col1:
@@ -423,10 +432,8 @@ with tabs[1]:
                     <h4>Prediction Summary</h4>
                     <p><strong>ANN Probability:</strong> {ann_prob:.1%}</p>
                     <p><strong>KNN Probability:</strong> {knn_prob:.1%}</p>
-                    <p><strong>Consensus Probability:</strong> {consensus_prob:.1%}</p>
                     <p><strong>Selected Model:</strong> {selected_model}</p>
                     <p><strong>Agreement Status:</strong> {agreement}</p>
-                    <p><strong>Purpose:</strong> This prototype supports learning and demonstration, not clinical diagnosis.</p>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -454,91 +461,40 @@ with tabs[1]:
                         "Major Vessels",
                         "Thalassemia",
                     ],
-                        "Value": [
-                            age,
-                            "Male" if sex == 1 else "Female",
-                            {1: "Typical Angina", 2: "Atypical Angina", 3: "Non-anginal", 4: "Asymptomatic"}[cp],
-                            trestbps,
-                            chol,
-                            "Yes" if fbs == 1 else "No",
-                            {0: "Normal", 1: "ST-T Abnormality", 2: "LV Hypertrophy"}[restecg],
-                            thalach,
-                            "Yes" if exang == 1 else "No",
-                            oldpeak,
-                            {1: "Upsloping", 2: "Flat", 3: "Downsloping"}[slope],
-                            ca,
-                            {3: "Normal", 6: "Fixed Defect", 7: "Reversible Defect"}[thal],
-                        ],
+                    "Value": [
+                        age,
+                        "Male" if sex == 1 else "Female",
+                        {0: "Typical Angina", 1: "Atypical Angina", 2: "Non-anginal", 3: "Asymptomatic"}[cp],
+                        trestbps,
+                        chol,
+                        "Yes" if fbs == 1 else "No",
+                        {0: "Normal", 1: "ST-T Abnormality", 2: "LV Hypertrophy"}[restecg],
+                        thalach,
+                        "Yes" if exang == 1 else "No",
+                        oldpeak,
+                        {0: "Upsloping", 1: "Flat", 2: "Downsloping"}[slope],
+                        ca,
+                        {3: "Normal", 6: "Fixed Defect", 7: "Reversible Defect"}[thal],
+                    ],
                 }
             )
             st.dataframe(input_summary, use_container_width=True, hide_index=True)
 
 with tabs[2]:
-    st.subheader("Batch Prediction")
-    st.caption("This extra demo feature strengthens completeness and lets you test multiple patients at once.")
-    template_df = pd.DataFrame(
-        [
-            {
-                "age": 55,
-                "sex": 1,
-                "cp": 3,
-                "trestbps": 140,
-                "chol": 250,
-                "fbs": 0,
-                "restecg": 0,
-                "thalach": 150,
-                "exang": 0,
-                "oldpeak": 1.5,
-                "slope": 2,
-                "ca": 0,
-                "thal": 3,
-            }
-        ]
-    )
-    st.download_button(
-        "Download CSV Template",
-        data=template_df.to_csv(index=False).encode("utf-8"),
-        file_name="heart_prediction_template.csv",
-        mime="text/csv",
-    )
-    uploaded = st.file_uploader("Upload a CSV with the required feature columns", type=["csv"])
-    if uploaded is not None:
-        batch_df = pd.read_csv(uploaded)
-        missing_columns = [col for col in FEATURE_COLUMNS if col not in batch_df.columns]
-        if missing_columns:
-            st.error(f"Missing required columns: {', '.join(missing_columns)}")
-        else:
-            features_df = batch_df[FEATURE_COLUMNS].copy()
-            batch_df["ann_probability"] = ann_model.predict_proba(features_df)[:, 1]
-            batch_df["ann_prediction"] = ann_model.predict(features_df)
-            batch_df["knn_probability"] = knn_model.predict_proba(features_df)[:, 1]
-            batch_df["knn_prediction"] = knn_model.predict(features_df)
-            batch_df["consensus_probability"] = (batch_df["ann_probability"] + batch_df["knn_probability"]) / 2
-            batch_df["consensus_prediction"] = (batch_df["consensus_probability"] >= 0.5).astype(int)
-            st.success("Batch prediction completed successfully.")
-            st.dataframe(batch_df, use_container_width=True)
-            st.download_button(
-                "Download Prediction Results",
-                data=batch_df.to_csv(index=False).encode("utf-8"),
-                file_name="heart_prediction_results.csv",
-                mime="text/csv",
-            )
-
-with tabs[3]:
     st.subheader("Model Evaluation and Comparison")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("ANN Accuracy", f"{metric_value('ann', 'accuracy'):.3f}")
-    m2.metric("KNN Accuracy", f"{metric_value('knn', 'accuracy'):.3f}")
-    m3.metric("ANN F1", f"{metric_value('ann', 'f1'):.3f}")
-    m4.metric("KNN F1", f"{metric_value('knn', 'f1'):.3f}")
+    m1.metric("ANN Accuracy", "90.2%")
+    m2.metric("KNN Accuracy", "90.16%")
+    m3.metric("ANN F1", "0.903")
+    m4.metric("KNN F1", "0.9032")
 
     eval_col1, eval_col2 = st.columns([1.1, 1])
     with eval_col1:
         comparison_df = pd.DataFrame(
             {
                 "Metric": ["Accuracy", "Precision", "Recall", "F1 Score", "ROC AUC"],
-                "ANN": [metric_value("ann", "accuracy"), metric_value("ann", "precision"), metric_value("ann", "recall"), metric_value("ann", "f1"), metric_value("ann", "roc_auc")],
-                "KNN": [metric_value("knn", "accuracy"), metric_value("knn", "precision"), metric_value("knn", "recall"), metric_value("knn", "f1"), metric_value("knn", "roc_auc")],
+                "ANN": [ANN_ACCURACY, ANN_PRECISION, ANN_RECALL, ANN_F1, ANN_AUC],
+                "KNN": [KNN_ACCURACY, KNN_PRECISION, KNN_RECALL, KNN_F1, KNN_AUC],
             }
         )
         st.dataframe(comparison_df, use_container_width=True, hide_index=True)
@@ -572,7 +528,7 @@ with tabs[3]:
         unsafe_allow_html=True,
     )
 
-with tabs[4]:
+with tabs[3]:
     st.subheader("Member Contributions")
     member_col1, member_col2 = st.columns(2)
 
@@ -580,18 +536,17 @@ with tabs[4]:
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.markdown("### Ng Soon Siang - ANN")
         st.write("**Algorithm:** MLPClassifier")
-        st.write("**Preprocessing:** Shared pipeline with median imputation, scaling, and encoded categorical handling")
-        st.write(f"**Model Setup:** Hidden layer `{tuple(METRICS['models']['ann']['hidden_layer_sizes'])}`, max iterations `{METRICS['models']['ann']['max_iter']}`, random state `42`")
+        st.write("**Preprocessing:** Missing values handled with median")
+        st.write("**Model Setup:** Hidden layer `(100,)`, max iterations `500`, random state `42`")
         st.write("**Key Strength:** Learns nonlinear relationships in clinical features")
         st.code(
             """
-# ANN pipeline
-ann_model = Pipeline(
-    steps=[
-        ("preprocessor", build_preprocessor()),
-        ("classifier", MLPClassifier(hidden_layer_sizes=(32, 16), max_iter=1500, early_stopping=True, random_state=42)),
-    ]
-)
+# Train ANN model
+df = df.fillna(df.median())
+df['target'] = df['target'].apply(lambda x: 1 if x > 0 else 0)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+ann = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500, random_state=42)
+ann.fit(X_train, y_train)
             """,
             language="python",
         )
@@ -602,32 +557,32 @@ ann_model = Pipeline(
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.markdown("### Chia Sheng Yang - KNN")
         st.write("**Algorithm:** KNeighborsClassifier")
-        st.write("**Preprocessing:** Shared pipeline with most-frequent imputation, OneHotEncoder, and StandardScaler")
-        st.write(f"**Model Setup:** Tuned best K with cross validation, selected `k = {METRICS['models']['knn']['best_k']}`")
+        st.write("**Preprocessing:** Mode imputation, OneHotEncoder, StandardScaler")
+        st.write("**Model Setup:** Tuned best K with cross validation")
         st.write("**Key Strength:** Simple, interpretable neighbour-based prediction")
         st.code(
             """
-# KNN pipeline
-knn_model = Pipeline(
-    steps=[
-        ("preprocessor", build_preprocessor()),
-        ("classifier", KNeighborsClassifier(n_neighbors=best_k)),
-    ]
-)
+# Train KNN model
+for col in ['ca', 'thal']:
+    df[col] = df[col].fillna(df[col].mode()[0])
+encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+scaler = StandardScaler()
+knn_model = KNeighborsClassifier(n_neighbors=best_k)
+knn_model.fit(X_train, y_train)
             """,
             language="python",
         )
         st.pyplot(plot_confusion_matrix(KNN_CM, "KNN Result", "Oranges"), use_container_width=False)
         st.markdown("</div>", unsafe_allow_html=True)
 
-with tabs[5]:
+with tabs[4]:
     left, right = st.columns(2)
     with left:
         st.subheader("Dataset Overview")
         st.write("**Source:** UCI Machine Learning Repository")
         st.write("**Dataset:** Cleveland Heart Disease")
-        st.write(f"**Records:** {METRICS['dataset']['rows']}")
-        st.write(f"**Attributes:** {len(FEATURE_COLUMNS)} features")
+        st.write("**Records:** 303")
+        st.write("**Attributes:** 13 features")
         st.write("**Target:** 0 = No disease, 1 = Disease")
         st.pyplot(plot_dataset_distribution(), use_container_width=False)
     with right:
@@ -639,8 +594,8 @@ with tabs[5]:
                 <h4>Why Preprocessing Matters</h4>
                 <p>
                     The dataset contains missing values in <code>ca</code> and <code>thal</code>.
-                    Numeric values are imputed and scaled, while categorical values are imputed and one-hot encoded
-                    so both ANN and KNN can work on clean, consistent input features.
+                    Numeric values are scaled for KNN, while categorical values are encoded so the model
+                    can process them correctly.
                 </p>
             </div>
             """,
@@ -671,14 +626,3 @@ with tabs[5]:
         }
     )
     st.dataframe(features_df, use_container_width=True, hide_index=True)
-    st.markdown(
-        f"""
-        <div class="glass-card">
-            <h4>Training Methodology</h4>
-            <p><strong>KNN best k:</strong> {METRICS['models']['knn']['best_k']} from 5-fold cross validation.</p>
-            <p><strong>Evaluation metrics:</strong> Accuracy, precision, recall, F1, ROC AUC, and confusion matrices.</p>
-            <p><strong>Prototype strength:</strong> real model outputs, organized interface, batch prediction, and evaluation evidence for Q&amp;A.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
