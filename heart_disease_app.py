@@ -625,4 +625,4 @@ with tabs[4]:
             "Type": ["Numeric", "Categorical", "Categorical", "Numeric", "Numeric", "Categorical", "Categorical", "Numeric", "Categorical", "Numeric", "Categorical", "Categorical", "Categorical"],
         }
     )
-    st.dataframe(features_df, use_container_width=True, hide_index=True)
+    st.dataframe(features_df, use_container_width=True, hide_index=True) 这个 heart_disease_app.py 有fulfill assignment requirement和rubric 如果没有我想要把他改成满分版
