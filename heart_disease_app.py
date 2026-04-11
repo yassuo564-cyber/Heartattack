@@ -48,16 +48,29 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Load Models
 ann_model = load('ann_model.joblib')
 knn_model = load('knn_model.joblib')
 encoder = load('encoder.joblib')
 scaler = load('scaler.joblib')
 
+# Load Dataset for EDA Graphs (Cached to make the app fast)
+@st.cache_data
+def load_data():
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+    column_names = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'target']
+    df = pd.read_csv(url, names=column_names, na_values='?')
+    df = df.fillna(df.median())
+    df['target'] = df['target'].apply(lambda x: 1 if x > 0 else 0)
+    return df
+
+df = load_data()
+
 st.title("Heart Disease Prediction System")
 st.caption("Supervised Machine Learning | ANN & KNN | Cleveland Heart Disease Dataset (UCI)")
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home", "Prediction", "Model Comparison", "Member Work", "Dataset Info"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home", "Prediction", "Model Comparison", "Member Work", "Dataset & EDA"])
 
 with tab1:
     c1, c2, c3, c4 = st.columns(4)
@@ -78,7 +91,7 @@ with tab1:
 
     st.markdown("---")
     st.subheader("How to Use")
-    st.write("Click on the **Prediction** tab to test the model. Click **Model Comparison** to view results. Click **Member Work** to see each member's contribution.")
+    st.write("Click on the **Prediction** tab to test the model. Click **Model Comparison** to view results. Click **Member Work** to see each member's contribution. Click **Dataset & EDA** for data visualizations.")
 
 with tab2:
     model_choice = st.selectbox("Model", ["ANN", "KNN"])
@@ -201,13 +214,9 @@ with tab3:
         ax2.set_ylabel('Actual')
         st.pyplot(fig2)
 
-    st.markdown("---")
-    st.write("Both models achieved accuracy above 90%. Both correctly identified 28 out of 32 heart disease cases. 4 cases were missed. There is no significant difference between ANN and KNN on this dataset.")
-
 with tab4:
     st.subheader("Ng Soon Siang - ANN (MLPClassifier)")
     st.markdown("---")
-
     col1, col2 = st.columns([1, 2])
     with col1:
         st.write("**Algorithm:** MLPClassifier")
@@ -221,11 +230,7 @@ with tab4:
 # Load dataset
 url = "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
 df = pd.read_csv(url, names=column_names, na_values='?')
-
-# Handle missing values
 df = df.fillna(df.median())
-
-# Convert target to binary
 df['target'] = df['target'].apply(lambda x: 1 if x > 0 else 0)
 
 # Split data
@@ -237,28 +242,9 @@ ann.fit(X_train, y_train)
 y_pred_ann = ann.predict(X_test)
         """, language="python")
 
-    st.write("**Results:**")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Accuracy", "90.2%")
-    col2.metric("Precision", "93.3%")
-    col3.metric("Recall", "87.5%")
-    col4.metric("F1 Score", "0.903")
-
-    fig1, ax1 = plt.subplots(figsize=(5, 4))
-    sns.heatmap(np.array([[27, 2], [4, 28]]), annot=True, fmt='d', cmap='Blues',
-                xticklabels=['No Disease', 'Disease'],
-                yticklabels=['No Disease', 'Disease'], ax=ax1, annot_kws={'size': 16})
-    ax1.set_xlabel('Predicted')
-    ax1.set_ylabel('Actual')
-    ax1.set_title('ANN Confusion Matrix')
-    st.pyplot(fig1)
-
     st.markdown("---")
-    st.markdown("---")
-
     st.subheader("Chia Sheng Yang - KNN (KNeighborsClassifier)")
     st.markdown("---")
-
     col1, col2 = st.columns([1, 2])
     with col1:
         st.write("**Algorithm:** KNeighborsClassifier")
@@ -269,9 +255,6 @@ y_pred_ann = ann.predict(X_test)
     with col2:
         st.write("**Code Overview:**")
         st.code("""
-# Load dataset
-df = pd.read_csv(file_path, names=columns, na_values='?')
-
 # Handle missing values
 for col in ['ca', 'thal']:
     df[col] = df[col].fillna(df[col].mode()[0])
@@ -280,54 +263,54 @@ for col in ['ca', 'thal']:
 encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
 scaler = StandardScaler()
 
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(X_processed, y, test_size=0.2, random_state=42)
-
 # Find best K and train
 knn_model = KNeighborsClassifier(n_neighbors=best_k)
 knn_model.fit(X_train, y_train)
 y_pred = knn_model.predict(X_test)
         """, language="python")
 
-    st.write("**Results:**")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Accuracy", "90.16%")
-    col2.metric("Precision", "93.33%")
-    col3.metric("Recall", "87.50%")
-    col4.metric("F1 Score", "0.903")
-
-    fig2, ax2 = plt.subplots(figsize=(5, 4))
-    sns.heatmap(np.array([[27, 2], [4, 28]]), annot=True, fmt='d', cmap='Oranges',
-                xticklabels=['No Disease', 'Disease'],
-                yticklabels=['No Disease', 'Disease'], ax=ax2, annot_kws={'size': 16})
-    ax2.set_xlabel('Predicted')
-    ax2.set_ylabel('Actual')
-    ax2.set_title('KNN Confusion Matrix')
-    st.pyplot(fig2)
-
 with tab5:
+    st.header("Dataset Overview & Exploratory Data Analysis (EDA)")
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Overview")
         st.write("**Source:** UCI Machine Learning Repository")
-        st.write("**Author:** Detrano et al. (1989)")
         st.write("**Records:** 303 patients")
         st.write("**Features:** 13 clinical attributes")
         st.write("**Target:** Heart disease (0 = No, 1 = Yes)")
     with col2:
         st.subheader("Target Distribution")
-        fig, ax = plt.subplots(figsize=(5, 4))
-        ax.bar(['No Disease', 'Disease'], [138, 165], color=['#2196F3', '#FF9800'])
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.bar(['No Disease', 'Disease'], [138, 165], color=['#2ECC71', '#FF4B4B'])
         ax.set_ylabel('Count')
         for i, v in enumerate([138, 165]):
-            ax.text(i, v + 2, str(v), ha='center', fontsize=14)
+            ax.text(i, v + 2, str(v), ha='center', fontsize=12)
         st.pyplot(fig)
 
     st.markdown("---")
-    st.subheader("Features")
-    features = pd.DataFrame({
-        'Feature': ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal'],
-        'Description': ['Age', 'Gender', 'Chest pain type', 'Blood pressure', 'Cholesterol', 'High blood sugar', 'ECG result', 'Max heart rate', 'Exercise chest pain', 'ST depression', 'ST slope', 'Blood vessels', 'Thalassemia'],
-        'Type': ['Num', 'Cat', 'Cat', 'Num', 'Num', 'Cat', 'Cat', 'Num', 'Cat', 'Num', 'Cat', 'Cat', 'Cat']
-    })
-    st.dataframe(features, use_container_width=True, hide_index=True)
+    
+    # New EDA Visualizations
+    st.subheader("1. Feature Correlation Heatmap")
+    st.caption("Shows how different clinical attributes correlate with heart disease (Target). Darker red means higher positive correlation.")
+    fig_corr, ax_corr = plt.subplots(figsize=(12, 6))
+    sns.heatmap(df.corr(), annot=True, cmap='coolwarm', fmt='.2f', ax=ax_corr, annot_kws={"size": 9})
+    st.pyplot(fig_corr)
+
+    col_eda1, col_eda2 = st.columns(2)
+    
+    with col_eda1:
+        st.subheader("2. Age vs Target")
+        st.caption("Distribution of heart disease across different ages.")
+        fig_age, ax_age = plt.subplots(figsize=(6, 4))
+        sns.histplot(data=df, x='age', hue='target', multiple='stack', palette=['#2ECC71', '#FF4B4B'], ax=ax_age)
+        ax_age.legend(title='Heart Disease', labels=['Yes (1)', 'No (0)'])
+        st.pyplot(fig_age)
+
+    with col_eda2:
+        st.subheader("3. Chest Pain Type vs Target")
+        st.caption("How different types of chest pain relate to the diagnosis.")
+        fig_cp, ax_cp = plt.subplots(figsize=(6, 4))
+        sns.countplot(data=df, x='cp', hue='target', palette=['#2ECC71', '#FF4B4B'], ax=ax_cp)
+        ax_cp.set_xticklabels(['Typical', 'Atypical', 'Non-anginal', 'Asymptomatic'])
+        ax_cp.legend(title='Heart Disease', labels=['No (0)', 'Yes (1)'])
+        st.pyplot(fig_cp)
