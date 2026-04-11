@@ -7,11 +7,24 @@ import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
-
-from train_models import ensure_artifacts
-
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 BASE_DIR = Path(__file__).resolve().parent
+DATA_PATH = BASE_DIR / "processed.cleveland.data"
 MODEL_DIR = BASE_DIR / "models"
 ARTIFACT_DIR = BASE_DIR / "artifacts"
 METRICS_PATH = ARTIFACT_DIR / "metrics.json"
@@ -31,6 +44,9 @@ FEATURE_COLUMNS = [
     "ca",
     "thal",
 ]
+
+NUMERIC_FEATURES = ["age", "trestbps", "chol", "thalach", "oldpeak"]
+CATEGORICAL_FEATURES = ["sex", "cp", "fbs", "restecg", "exang", "slope", "ca", "thal"]
 
 FEATURE_INFO = {
     "age": {"label": "Age", "kind": "number", "min": 20, "max": 100, "value": 54, "step": 1},
@@ -121,6 +137,22 @@ FEATURE_INFO = {
     },
 }
 
+COLUMNS = [
+    "age",
+    "sex",
+    "cp",
+    "trestbps",
+    "chol",
+    "fbs",
+    "restecg",
+    "thalach",
+    "exang",
+    "oldpeak",
+    "slope",
+    "ca",
+    "thal",
+    "target",
+]
 
 st.set_page_config(
     page_title="Heart Disease Prediction Studio",
@@ -142,14 +174,12 @@ st.markdown(
         border-radius: 24px;
         background: linear-gradient(135deg, #101828 0%, #1d3557 55%, #457b9d 100%);
         color: white;
-        box-shadow: 0 18px 50px rgba(16, 24, 40, 0.18);
     }
     .card {
         padding: 1rem 1.1rem;
         border-radius: 18px;
         background: rgba(255, 255, 255, 0.92);
         border: 1px solid rgba(16, 24, 40, 0.08);
-        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
     }
     .risk-high {
         color: #b42318;
@@ -164,6 +194,143 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+def load_dataset() -> pd.DataFrame:
+    if not DATA_PATH.exists():
+        raise FileNotFoundError("processed.cleveland.data not found in repo root.")
+    df = pd.read_csv(DATA_PATH, names=COLUMNS, na_values="?")
+    df["target"] = (df["target"] > 0).astype(int)
+    return df
+
+def build_preprocessor() -> ColumnTransformer:
+    numeric_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
+    categorical_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OneHotEncoder(handle_unknown="ignore")),
+        ]
+    )
+    return ColumnTransformer(
+        transformers=[
+            ("num", numeric_pipeline, NUMERIC_FEATURES),
+            ("cat", categorical_pipeline, CATEGORICAL_FEATURES),
+        ]
+    )
+
+def calculate_metrics(model: Pipeline, x_test: pd.DataFrame, y_test: pd.Series) -> dict:
+    y_pred = model.predict(x_test)
+    y_prob = model.predict_proba(x_test)[:, 1]
+    return {
+        "accuracy": round(float(accuracy_score(y_test, y_pred)), 4),
+        "precision": round(float(precision_score(y_test, y_pred)), 4),
+        "recall": round(float(recall_score(y_test, y_pred)), 4),
+        "f1": round(float(f1_score(y_test, y_pred)), 4),
+        "roc_auc": round(float(roc_auc_score(y_test, y_prob)), 4),
+        "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
+    }
+
+def train_and_save_artifacts() -> dict:
+    MODEL_DIR.mkdir(exist_ok=True)
+    ARTIFACT_DIR.mkdir(exist_ok=True)
+
+    df = load_dataset()
+    x = df.drop(columns=["target"])
+    y = df["target"]
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    best_k = None
+    best_knn_score = -1.0
+    for k in range(3, 18, 2):
+        knn_candidate = Pipeline(
+            steps=[
+                ("preprocessor", build_preprocessor()),
+                ("classifier", KNeighborsClassifier(n_neighbors=k)),
+            ]
+        )
+        score = cross_val_score(knn_candidate, x_train, y_train, cv=cv, scoring="f1").mean()
+        if score > best_knn_score:
+            best_knn_score = score
+            best_k = k
+
+    knn_model = Pipeline(
+        steps=[
+            ("preprocessor", build_preprocessor()),
+            ("classifier", KNeighborsClassifier(n_neighbors=best_k)),
+        ]
+    )
+
+    ann_model = Pipeline(
+        steps=[
+            ("preprocessor", build_preprocessor()),
+            (
+                "classifier",
+                MLPClassifier(
+                    hidden_layer_sizes=(32, 16),
+                    activation="relu",
+                    alpha=0.001,
+                    learning_rate_init=0.001,
+                    max_iter=1500,
+                    early_stopping=True,
+                    random_state=42,
+                ),
+            ),
+        ]
+    )
+
+    knn_model.fit(x_train, y_train)
+    ann_model.fit(x_train, y_train)
+
+    joblib.dump(knn_model, MODEL_DIR / "knn_model.joblib")
+    joblib.dump(ann_model, MODEL_DIR / "ann_model.joblib")
+
+    metrics = {
+        "dataset": {
+            "rows": int(len(df)),
+            "positive_cases": int(y.sum()),
+            "negative_cases": int((1 - y).sum()),
+            "missing_counts": {
+                "ca": int(df["ca"].isna().sum()),
+                "thal": int(df["thal"].isna().sum()),
+            },
+        },
+        "models": {
+            "knn": {
+                **calculate_metrics(knn_model, x_test, y_test),
+                "best_k": int(best_k),
+                "cv_f1": round(float(best_knn_score), 4),
+            },
+            "ann": {
+                **calculate_metrics(ann_model, x_test, y_test),
+                "hidden_layer_sizes": [32, 16],
+                "max_iter": 1500,
+            },
+        },
+    }
+
+    with (ARTIFACT_DIR / "metrics.json").open("w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2)
+
+    return metrics
+
+def ensure_artifacts() -> dict:
+    metrics_path = ARTIFACT_DIR / "metrics.json"
+    ann_path = MODEL_DIR / "ann_model.joblib"
+    knn_path = MODEL_DIR / "knn_model.joblib"
+
+    if metrics_path.exists() and ann_path.exists() and knn_path.exists():
+        with metrics_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+
+    return train_and_save_artifacts()
 
 @st.cache_resource
 def load_models() -> dict[str, object]:
@@ -173,7 +340,6 @@ def load_models() -> dict[str, object]:
         "knn": joblib.load(MODEL_DIR / "knn_model.joblib"),
     }
 
-
 @st.cache_data
 def load_metrics() -> dict:
     if not METRICS_PATH.exists():
@@ -181,18 +347,14 @@ def load_metrics() -> dict:
     with METRICS_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def build_input_frame(values: dict[str, float]) -> pd.DataFrame:
     return pd.DataFrame([[values[col] for col in FEATURE_COLUMNS]], columns=FEATURE_COLUMNS)
-
 
 def prediction_label(value: int) -> str:
     return "Heart Disease Detected" if int(value) == 1 else "No Heart Disease Detected"
 
-
 def confidence_class(probability: float) -> str:
     return "risk-high" if probability >= 0.5 else "risk-low"
-
 
 def plot_confusion_matrix(matrix: list[list[int]], title: str):
     fig, ax = plt.subplots(figsize=(4.2, 3.6))
@@ -207,7 +369,6 @@ def plot_confusion_matrix(matrix: list[list[int]], title: str):
     ax.set_ylabel("Actual")
     fig.tight_layout()
     return fig
-
 
 def render_manual_form() -> dict[str, float]:
     values: dict[str, float] = {}
@@ -228,13 +389,11 @@ def render_manual_form() -> dict[str, float]:
                 values[feature] = info["options"][selected_label]
     return values
 
-
 def validate_batch_columns(df: pd.DataFrame) -> tuple[bool, str]:
     missing = [col for col in FEATURE_COLUMNS if col not in df.columns]
     if missing:
         return False, f"Missing columns: {', '.join(missing)}"
     return True, ""
-
 
 def main() -> None:
     models = load_models()
@@ -467,7 +626,6 @@ def main() -> None:
                     file_name="heart_predictions_output.csv",
                     mime="text/csv",
                 )
-
 
 if __name__ == "__main__":
     main()
