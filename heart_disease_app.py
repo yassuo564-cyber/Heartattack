@@ -119,9 +119,9 @@ with tab1:
         st.subheader("KNN")
         st.write("K-Nearest Neighbours using KNeighborsClassifier. Predicts using the majority vote of nearest neighbours.")
     with col3:
-    st.subheader("Radar Chart")
-    st.caption("Multi-metric comparison of ANN vs KNN")
-    st.pyplot(plot_radar_chart())
+        st.subheader("Radar Chart")
+        st.caption("Multi-metric comparison of ANN vs KNN")
+        st.pyplot(plot_radar_chart())
     
     
     st.markdown("---")
