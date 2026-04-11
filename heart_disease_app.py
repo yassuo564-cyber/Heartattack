@@ -25,6 +25,34 @@ ann_model = load("ann_model.joblib")
 knn_model = load("knn_model.joblib")
 encoder = load("encoder.joblib")
 scaler = load("scaler.joblib")
+def plot_radar_chart():
+    labels = np.array(["Accuracy", "Precision", "Recall", "F1", "AUC"])
+
+    ann_vals = np.array([ANN_ACCURACY, ANN_PRECISION, ANN_RECALL, ANN_F1, ANN_AUC])
+    knn_vals = np.array([KNN_ACCURACY, KNN_PRECISION, KNN_RECALL, KNN_F1, KNN_AUC])
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+
+    ann_vals = np.concatenate((ann_vals, [ann_vals[0]]))
+    knn_vals = np.concatenate((knn_vals, [knn_vals[0]]))
+    angles = np.concatenate((angles, [angles[0]]))
+
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, polar=True)
+
+    ax.plot(angles, ann_vals, linewidth=2, label="ANN")
+    ax.fill(angles, ann_vals, alpha=0.2)
+
+    ax.plot(angles, knn_vals, linewidth=2, label="KNN")
+    ax.fill(angles, knn_vals, alpha=0.2)
+
+    ax.set_thetagrids(angles[:-1] * 180 / np.pi, labels)
+    ax.set_ylim(0.8, 1.0)
+
+    ax.set_title("Radar Chart Comparison")
+    ax.legend(loc="upper right")
+
+    return fig
 
 st.markdown("""
 <style>
@@ -83,13 +111,17 @@ with tab1:
 
     st.markdown("---")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.subheader("ANN")
         st.write("Artificial Neural Network using MLPClassifier. Has 100 hidden neurons and learns through backpropagation.")
     with col2:
         st.subheader("KNN")
         st.write("K-Nearest Neighbours using KNeighborsClassifier. Predicts using the majority vote of nearest neighbours.")
+        with col3:
+    st.subheader("Radar Chart")
+    st.caption("Multi-metric comparison of ANN vs KNN")
+    st.pyplot(plot_radar_chart())
 
     st.markdown("---")
     st.subheader("How to Use")
